@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙の消えた3つの手がかり</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 3Dカードフリップ効果の設定 */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        /* アニメーションと光沢 */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.9); }
+        }
+        .danger-glow {
+            animation: pulseGlow 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans select-none">
+
+    <!-- メインコンテンツコンテナ -->
+    <main class="w-full max-w-xl bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-md relative overflow-hidden">
+        
+        <!-- ヘッダーエリア -->
+        <header class="text-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-wider bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent mb-2">
+                🚀 宇宙の消えた3つの手がかり
+            </h1>
+            <p id="game-status-text" class="text-sm md:text-base text-slate-300 h-6">
+                「スタート」を押して調査を開始してください
+            </p>
+        </header>
+
+        <!-- ステータス表示（レベル・残り時間・スコア） -->
+        <section aria-label="ゲーム状況" class="grid grid-cols-4 gap-2 mb-6 bg-slate-800/80 p-3 rounded-2xl border border-slate-700/60 text-center">
+            <div class="flex flex-col items-center">
+                <span class="text-xs text-slate-400">難易度</span>
+                <span id="level-display" class="text-lg font-bold text-indigo-400">LV. 1</span>
+            </div>
+            <div class="flex flex-col items-center border-l border-slate-700/60">
+                <span class="text-xs text-slate-400">残り時間</span>
+                <span id="timer-display" class="text-lg font-bold text-amber-400">30.0s</span>
+            </div>
+            <div class="flex flex-col items-center border-l border-slate-700/60">
+                <span class="text-xs text-slate-400">発見数</span>
+                <span id="score-display" class="text-lg font-bold text-cyan-400">0 / 3</span>
+            </div>
+            <div class="flex flex-col items-center border-l border-slate-700/60">
+                <span class="text-xs text-slate-400">ハズレ</span>
+                <span id="miss-display" class="text-lg font-bold text-rose-400">0 / 3</span>
+            </div>
+        </section>
+
+        <!-- スタートボタンエリア -->
+        <div class="flex justify-center mb-6">
+            <button id="start-btn" onclick="startGame()" class="px-8 py-3 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer">
+                🚀 スタート (Enter)
+            </button>
+        </div>
+
+        <!-- ゲームボード（9つのカード: 3x3） -->
+        <!-- ゲームボード（マス数はレベルにより変化） -->
+        <section aria-label="宇宙マップ" class="perspective-1000 min-h-[280px] md:min-h-[320px] flex items-center justify-center">
+            <div id="cards-container" class="grid gap-3 md:gap-4 w-full"></div>
+        </section>
+
+        <!-- リザルトモーダル（ゲーム終了時に表示） -->
+        <div id="result-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border-2 border-indigo-500 rounded-2xl p-6 text-center max-w-sm w-full shadow-2xl">
+                <div id="modal-icon" class="text-5xl mb-3">🏆</div>
+                <h2 id="modal-title" class="text-2xl font-bold mb-2">ミッション結果</h2>
+                <p id="modal-desc" class="text-slate-300 mb-6 text-sm whitespace-pre-line"></p>
+                <button id="modal-action-btn" onclick="handleModalAction()" class="w-full py-3 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5">
+                    🔄 もう一度遊ぶ (Enter)
+                </button>
+            </div>
+        </div>
+
+        <!-- ガイド・ヒント表記 -->
+        <footer class="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-400">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <span class="font-bold text-slate-300">操作方法:</span> 
+                    ボタンのタップ / キーボード <kbd id="key-guide" class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">1〜9</kbd>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="clue-guide">🔍 手がかり(3個)</span>
+                    <span>🕳️ 危険(即敗北)</span>
+                    <span>❌ ハズレ(3回で失敗)</span>
+                </div>
+            </div>
+        </footer>
+
+    </main>
+
+    <script>
+        // カードの種類定義
+        const TYPE_CLUE = { id: 'clue', symbol: '🔍', name: '手がかり', bg: 'bg-cyan-900/60 border-cyan-400' };
+        const TYPE_DANGER = { id: 'danger', symbol: '🕳️', name: 'ブラックホール', bg: 'bg-red-900/60 border-red-500 danger-glow' };
+        const TYPE_EMPTY = { id: 'empty', symbol: '❌', name: 'ハズレ', bg: 'bg-slate-800 border-slate-600' };
+
+        let cards = [];
+        let state = 'IDLE'; // 'IDLE', 'MEMORIZE', 'PLAY', 'TEMP_SHOW', 'GAMEOVER'
+        let foundClues = 0;
+        let missCount = 0;
+        const MAX_MISSES = 3;
+        let timeLeft = 30.0;
+        let currentLevel = 1;
+        let memorizationTime = 3.0; // レベルで変化
+        
+        let totalCards = 9;
+        let requiredClues = 3;
+
+        let timerInterval = null;
+        let memorizationTimeout = null;
+        let tempShowTimeout = null;
+
+        // DOM要素
+        const cardsContainer = document.getElementById('cards-container');
+        const timerDisplay = document.getElementById('timer-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const missDisplay = document.getElementById('miss-display');
+        const levelDisplay = document.getElementById('level-display');
+        const statusText = document.getElementById('game-status-text');
+        const startBtn = document.getElementById('start-btn');
+        const resultModal = document.getElementById('result-modal');
+        const modalActionBtn = document.getElementById('modal-action-btn');
+        const keyGuide = document.getElementById('key-guide');
+        const clueGuide = document.getElementById('clue-guide');
+
+        // レベル条件に応じたマス目・必要手がかり数の判定
+        function updateLevelParams() {
+            if (currentLevel >= 20) {
+                totalCards = 15;
+                requiredClues = 5;
+            } else if (currentLevel >= 15) {
+                totalCards = 15;
+                requiredClues = 4;
+            } else if (currentLevel >= 10) {
+                totalCards = 12;
+                requiredClues = 4;
+            } else if (currentLevel >= 5) {
+                totalCards = 12;
+                requiredClues = 3;
+            } else {
+                totalCards = 9;
+                requiredClues = 3;
+            }
+        }
+
+        // 初期化処理
+        function initBoard() {
+            updateLevelParams();
+
+            cardsContainer.innerHTML = '';
+            cards = [];
+
+            // レベルごとのグリッドレイアウト切り替え (9: 3x3, 12: 3x4, 15: 3x5)
+            if (totalCards === 15) {
+                cardsContainer.className = 'grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 w-full';
+                keyGuide.textContent = '1〜9, A〜F';
+            } else if (totalCards === 12) {
+                cardsContainer.className = 'grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-3 w-full';
+                keyGuide.textContent = '1〜9, A〜C';
+            } else {
+                cardsContainer.className = 'grid grid-cols-3 gap-3 md:gap-4 w-full';
+                keyGuide.textContent = '1〜9';
+            }
+
+            clueGuide.textContent = `🔍 手がかり(${requiredClues}個)`;
+
+            for (let i = 0; i < totalCards; i++) {
+                const cardEl = document.createElement('button');
+                cardEl.className = 'card-button relative w-full aspect-square rounded-xl transition-all duration-300 transform-style-3d cursor-pointer disabled:cursor-not-allowed text-xl md:text-2xl font-bold flex flex-col items-center justify-center border-2 bg-slate-800 border-slate-700';
+                cardEl.setAttribute('aria-label', `カード ${i + 1}`);
+                cardEl.onclick = () => selectCard(i);
+
+                // キーガイドラベル表示用テキスト
+                let labelText = (i + 1).toString();
+                if (i >= 9) {
+                    labelText = String.fromCharCode(65 + (i - 9)); // 10番目以降は A, B, C...
+                }
+
+                // カード前面（アイテム表示面）・背面（伏せ番号面）構造
+                cardEl.innerHTML = `
+                    <div class="card-face card-front absolute inset-0 rounded-xl flex flex-col items-center justify-center backface-hidden bg-slate-900">
+                        <span class="symbol-icon"></span>
+                    </div>
+                    <div class="card-face card-back absolute inset-0 rounded-xl flex flex-col items-center justify-center backface-hidden rotate-y-180 bg-slate-800 border-2 border-slate-700 shadow-md">
+                        <span class="text-slate-500 font-tech text-base md:text-lg font-bold">${labelText}</span>
+                    </div>
+                `;
+
+                cardsContainer.appendChild(cardEl);
+                cards.push({
+                    element: cardEl,
+                    type: null,
+                    isRevealed: false
+                });
+            }
+
+            updateUI();
+        }
+
+        // ゲームの開始
+        function startGame() {
+            if (state !== 'IDLE') return;
+
+            // ボタン非表示・状態更新
+            startBtn.classList.add('hidden');
+            resultModal.classList.add('hidden');
+            
+            foundClues = 0;
+            missCount = 0;
+            timeLeft = 30.0;
+            updateUI();
+
+            // 山札作成 (手がかり: requiredClues, ブラックホール: 1, 残り: ハズレ)
+            const deck = [];
+            for (let i = 0; i < requiredClues; i++) deck.push(TYPE_CLUE);
+            deck.push(TYPE_DANGER);
+            const emptyCount = totalCards - requiredClues - 1;
+            for (let i = 0; i < emptyCount; i++) deck.push(TYPE_EMPTY);
+            
+            // フィッシャー–イェーツのシャッフル
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            cards.forEach((card, idx) => {
+                card.type = deck[idx];
+                card.isRevealed = false;
+                
+                // 見た目のセット（前面にアイテムのシンボル・背景色を設定）
+                const frontFace = card.element.querySelector('.card-front');
+                frontFace.className = `card-face card-front absolute inset-0 rounded-xl flex flex-col items-center justify-center backface-hidden border-2 ${card.type.bg}`;
+                frontFace.querySelector('.symbol-icon').textContent = card.type.symbol;
+
+                // 最初は表面（アイテム）を見せるため rotate-y-180 を外す
+                card.element.classList.remove('rotate-y-180');
+                card.element.disabled = true;
+            });
+
+            // 記憶フェーズのスタート
+            startMemorizationPhase();
+        }
+
+        // 記憶フェーズ（配置を見せる）
+        function startMemorizationPhase() {
+            state = 'MEMORIZE';
+            statusText.textContent = `👁️ アイテムの位置を覚えてください！ (${memorizationTime.toFixed(1)}秒)`;
+            statusText.className = "text-sm md:text-base text-amber-300 font-bold h-6 animate-pulse";
+
+            // 全カードを表（アイテム面）にする
+            cards.forEach(card => {
+                card.element.classList.remove('rotate-y-180');
+            });
+
+            // 指定時間後に伏せて（裏向きにして）ゲーム開始
+            memorizationTimeout = setTimeout(() => {
+                cards.forEach(card => {
+                    card.element.classList.add('rotate-y-180');
+                    card.element.disabled = false;
+                });
+
+                state = 'PLAY';
+                statusText.textContent = `🔍 手がかりを${requiredClues}つ見つけてください！`;
+                statusText.className = "text-sm md:text-base text-cyan-300 h-6";
+
+                // タイマースタート
+                startTimer();
+            }, memorizationTime * 1000);
+        }
+
+        // タイマー制御
+        function startTimer() {
+            clearInterval(timerInterval);
+            const startTime = Date.now();
+            const initialTimeLeft = timeLeft;
+
+            timerInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                timeLeft = Math.max(0, initialTimeLeft - elapsed);
+                timerDisplay.textContent = `${timeLeft.toFixed(1)}s`;
+
+                if (timeLeft <= 0) {
+                    endGame(false, "⏰ タイムオーバー！30秒が経過しました。");
+                }
+            }, 100);
+        }
+
+        // カード選択処理
+        function selectCard(index) {
+            if (state !== 'PLAY') return;
+
+            const card = cards[index];
+            if (card.isRevealed) return;
+
+            // カードをめくる（表面を表にする）
+            card.isRevealed = true;
+            card.element.classList.remove('rotate-y-180');
+
+            if (card.type.id === TYPE_CLUE.id) {
+                // 手がかり発見
+                foundClues++;
+                updateUI();
+
+                if (foundClues >= requiredClues) {
+                    if (currentLevel >= 40) {
+                        endGame(true, "👑 おめでとうございます！全40レベルのミッションを全制覇しました！", true);
+                    } else {
+                        endGame(true, "🎉 ミッション成功！すべての手がかりを発見しました！", false);
+                    }
+                }
+            } else if (card.type.id === TYPE_DANGER.id) {
+                // ブラックホール（即ゲームオーバー）
+                endGame(false, "💥 ブラックホールに吸い込まれました！(即ゲームオーバー)");
+            } else {
+                // ハズレ（❌選択時のカウント増加とゲームオーバー判定）
+                missCount++;
+                updateUI();
+
+                if (missCount >= MAX_MISSES) {
+                    endGame(false, "❌ ハズレを3回選んでしまいました！(ミッション失敗)");
+                } else {
+                    state = 'TEMP_SHOW';
+                    statusText.textContent = `❌ ここには何もありません... (残りミス制限: ${MAX_MISSES - missCount}回)`;
+                    
+                    tempShowTimeout = setTimeout(() => {
+                        if (state === 'TEMP_SHOW') {
+                            card.isRevealed = false;
+                            card.element.classList.add('rotate-y-180');
+                            state = 'PLAY';
+                            statusText.textContent = `🔍 手がかりを${requiredClues}つ見つけてください！`;
+                        }
+                    }, 800);
+                }
+            }
+        }
+
+        // ゲーム終了処理
+        function endGame(isWin, message, isAllCleared = false) {
+            clearInterval(timerInterval);
+            state = 'GAMEOVER';
+
+            // 全カードをめくって答え合わせ（表面を表示）
+            cards.forEach(card => {
+                card.element.classList.remove('rotate-y-180');
+                card.element.disabled = true;
+            });
+
+            // モーダル表示
+            const modalTitle = document.getElementById('modal-title');
+            const modalDesc = document.getElementById('modal-desc');
+            const modalIcon = document.getElementById('modal-icon');
+
+            if (isWin) {
+                if (isAllCleared) {
+                    modalIcon.textContent = "🏆";
+                    modalTitle.textContent = "全レベル完全制覇！";
+                    modalDesc.textContent = message;
+                    modalActionBtn.textContent = "🔄 LV.1 からもう一度遊ぶ (Enter)";
+                } else {
+                    modalIcon.textContent = "🚀";
+                    modalTitle.textContent = "調査成功！";
+                    currentLevel++;
+                    // 難易度調整: 記憶時間を短縮（最小1秒まで）
+                    memorizationTime = Math.max(1.0, memorizationTime - 0.5);
+                    modalDesc.textContent = `${message}\n次回の難易度: LV.${currentLevel} (記憶時間: ${memorizationTime.toFixed(1)}秒)`;
+                    
+                    // 成功時：ボタンを「次のレベルに進む」に変更
+                    modalActionBtn.textContent = "➡️ 次のレベルに進む (Enter)";
+                }
+            } else {
+                modalIcon.textContent = "💀";
+                modalTitle.textContent = "ミッション失敗";
+                modalDesc.textContent = message;
+                
+                // 失敗時：ボタンを「もう一度遊ぶ」に変更
+                modalActionBtn.textContent = "🔄 もう一度遊ぶ (Enter)";
+            }
+
+            resultModal.classList.remove('hidden');
+        }
+
+        // モーダルのボタンが押された時の処理（成功時は即開始、全クリアまたは失敗時はリセット後スタート画面）
+        function handleModalAction() {
+            const isNextLevel = modalActionBtn.textContent.includes('次のレベル');
+            resultModal.classList.add('hidden');
+            
+            if (isNextLevel) {
+                // 成功かつLV.40未達成時は次のレベルを開始
+                startNextLevel();
+            } else {
+                // 失敗またはLV.40全クリア時はレベル1と記憶時間を初期値に戻してリセット
+                currentLevel = 1;
+                memorizationTime = 3.0;
+
+                // 初期化してスタートボタン表示状態に戻す
+                startBtn.classList.remove('hidden');
+                state = 'IDLE';
+                foundClues = 0;
+                missCount = 0;
+                timeLeft = 30.0;
+                statusText.textContent = "「スタート」を押して調査を開始してください";
+                statusText.className = "text-sm md:text-base text-slate-300 h-6";
+                initBoard();
+            }
+        }
+
+        // 次のレベルを即時スタート
+        function startNextLevel() {
+            state = 'IDLE';
+            initBoard();
+            startGame();
+        }
+
+        // UI表示の更新
+        function updateUI() {
+            scoreDisplay.textContent = `${foundClues} / ${requiredClues}`;
+            missDisplay.textContent = `${missCount} / ${MAX_MISSES}`;
+            timerDisplay.textContent = `${timeLeft.toFixed(1)}s`;
+            levelDisplay.textContent = `LV. ${currentLevel}`;
+        }
+
+        // キーボード操作対応 (1-9キー, A-Fキー, Enter)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (state === 'IDLE') {
+                    startGame();
+                } else if (state === 'GAMEOVER') {
+                    handleModalAction();
+                }
+            } else if (state === 'PLAY') {
+                const key = e.key.toUpperCase();
+                let index = -1;
+
+                if (key >= '1' && key <= '9') {
+                    index = parseInt(key) - 1;
+                } else if (key >= 'A' && key <= 'F') {
+                    index = 9 + (key.charCodeAt(0) - 65);
+                }
+
+                if (index >= 0 && index < totalCards) {
+                    selectCard(index);
+                }
+            }
+        });
+
+        // ページロード時初期化
+        window.onload = () => {
+            initBoard();
+        };
+    </script>
+</body>
+</html>
