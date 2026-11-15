@@ -116,6 +116,7 @@
 
         let cards = [];
         let state = 'IDLE'; // 'IDLE', 'MEMORIZE', 'PLAY', 'TEMP_SHOW', 'GAMEOVER'
+        let resultAction = null; // 'next-level' または 'restart'
         let foundClues = 0;
         let missCount = 0;
         const MAX_MISSES = 3;
@@ -220,6 +221,7 @@
         // ゲームの開始
         function startGame() {
             if (state !== 'IDLE') return;
+            resultAction = null;
 
             // ボタン非表示・状態更新
             startBtn.classList.add('hidden');
@@ -358,6 +360,7 @@
         function endGame(isWin, message, isAllCleared = false) {
             clearInterval(timerInterval);
             state = 'GAMEOVER';
+            resultAction = isWin && !isAllCleared ? 'next-level' : 'restart';
 
             // 全カードをめくって答え合わせ（表面を表示）
             cards.forEach(card => {
@@ -401,7 +404,9 @@
 
         // モーダルのボタンが押された時の処理（成功時は即開始、全クリアまたは失敗時はリセット後スタート画面）
         function handleModalAction() {
-            const isNextLevel = modalActionBtn.textContent.includes('次のレベル');
+            if (state !== 'GAMEOVER') return;
+            const isNextLevel = resultAction === 'next-level';
+            resultAction = null;
             resultModal.classList.add('hidden');
             
             if (isNextLevel) {
